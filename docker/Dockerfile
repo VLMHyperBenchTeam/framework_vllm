@@ -15,10 +15,17 @@ RUN apt-get update -y && apt upgrade -y && apt install -y --no-install-recommend
 # Создание ссылки для Python
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
+# Обновление pip
+RUN python3 -m pip install --upgrade pip
+
 # Установка библиотек
 ARG pytorch_url=https://download.pytorch.org/whl/${PYTORCH_CUDA_REPO}
 RUN pip install --no-cache-dir torch==2.5.1 torchvision==0.20.1 --index-url ${pytorch_url}
-RUN pip install --no-cache-dir vllm
+RUN pip install --no-cache-dir "transformers>=4.48.2" \
+    vllm==0.7.2
+
+# Очистка кэша pip (опционально)
+RUN pip cache purge
 
 # Создание рабочей директории
 WORKDIR /workspace
