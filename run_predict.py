@@ -1,62 +1,46 @@
-from vllm import LLM, SamplingParams
-from PIL import Image
+import os
+import subprocess
 
-# Qwen2-VL
-def run_qwen2_vl(model_name: str, question: str):   
-
-    llm = LLM(
-        model=model_name,
-        max_model_len=4096,
-        max_num_seqs=1,
-        gpu_memory_utilization=0.7
-    )
-
-    prompt = ("<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
-              f"<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>"
-              f"{question}<|im_end|>\n"
-              "<|im_start|>assistant\n")
-    stop_token_ids = None
-    return llm, prompt, stop_token_ids
+from model_interface.model_factory import ModelFactory
 
 
+if __name__ == "__main__":
 
-# Загрузка изображения
-def load_image(image_path: str):
-    """
-    Загружает изображение с помощью PIL.
-    """
-    return Image.open(image_path).convert("RGB")
+    cache_directory = "model_cache"
 
+    # Сохраняем модели Qwen2-VL в примонтированную папку
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cache_directory = os.path.join(script_dir, cache_directory)
 
-if __name__ == "__main__":   
+    # Имена моделей и семейство моделей
+    model_name_1 = "Qwen/Qwen2-VL-2B-Instruct"
+    model_family = "vLLM"
 
-    model_example_map = {
-    "qwen2_vl": run_qwen2_vl}
+    # Инфо о том где взять класс для семейства моделей
+    package = "framework_vllm"
+    module = "models"
+    model_class = "FrameworkVllmInterface"
+    model_class_path = f"{package}.{module}:{model_class}"
 
-    model_family = "qwen2_vl"
-    model_name = "Qwen/Qwen2-VL-2B-Instruct"
-    image_path = "./images/1.jpg"
-    image = load_image(image_path)
-    user_prompt  = "What is the content of this image?"
+    # Регистрация модели в фабрике
+    ModelFactory.register_model(model_family, model_class_path)
 
-    if model_family not in model_example_map:
-        raise ValueError(f"Model type {model_family} is not supported.")
-
-    llm, prompt, stop_token_ids = model_example_map[model_family](model_name, user_prompt)
-
-    sampling_params = SamplingParams(temperature=0,
-                                     max_tokens=None,
-                                     stop_token_ids=stop_token_ids)
-    
-    inputs = {
-        "prompt": prompt,
-        "multi_modal_data": {
-            "image": image
-        },
+    # создаем модель
+    model_init_params = {
+        "model_name": model_name_1,
+        "system_prompt": "",
+        "cache_dir": "model_cache",
+        "device_map": "cuda:0",
     }
 
-    outputs = llm.generate(inputs, sampling_params=sampling_params)
+    model = ModelFactory.get_model(model_family, model_init_params)
 
-    for o in outputs:
-        generated_text = o.outputs[0].text
-        print(generated_text)
+    # отвечаем на вопрос о по одной картинке
+    image_path = "./images/1.jpg"
+    question = "Какой текст на изображении?"
+    model_answer = model.predict_on_image(image=image_path, question=question)
+    print(model_answer)
+    
+    subprocess.run(["nvidia-smi"])
+
+    print(model_answer)
